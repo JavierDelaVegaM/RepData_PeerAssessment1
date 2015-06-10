@@ -1,25 +1,167 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Assesstment 1"
+author: "Javier De la Vega"
+date: "Saturday, June 13, 2015"
+output: html_document
 ---
 
+```{r librerias, echo=FALSE}
+##install.packages("doBy")
+library(doBy)
+##install.packages("plyr")
+library(plyr)
+##install.packages("lattice")
+library(lattice)
+```
 
-## Loading and preprocessing the data
+**Loading and preprocessing the data**
+
+Show any code that is needed to
+
+1. Load the data (i.e. read.csv())
+```{r directorio, echo=FALSE}
+setwd("C:\\JAVIER\\HITSS\\_00 Big Data\\00 Data Scientist\\Cousera\\_Especializacion\\05 Reproducible Research\\RepData_PeerAssessment1")
+```
+```{r archivo}
+tabAll = read.csv("activity.csv", sep=",", header=TRUE, colClasses = "character")
+```
+
+2. Process/transform the data (if necessary) into a format suitable for your analysis
+```{r tipo dato}
+## Strings are converted to their corresponding types.
+tabAll[,1] = as.numeric(tabAll[,1])
+tabAll[,2] = as.Date(tabAll[,2],"%d/%m/%Y")
+tabAll[,3] = as.numeric(tabAll[,3])
+
+head(tabAll)
+```
 
 
+**What is mean total number of steps taken per day?**
 
-## What is mean total number of steps taken per day?
+For this part of the assignment, you can ignore the missing values in the dataset.
+
+1. Calculate the total number of steps taken per day
+
+```{r mean per day}
+## Remove all of the steps nulls
+tabAct=subset(tabAll, !is.na(steps))
+## Applies all the functions (sum, mean, median, max) that are required
+stat_vs_date = summaryBy(steps ~ date, data=tabAct, FUN=c(sum, mean, median))
+## It presents the first values of the sum of steps per day
+head(stat_vs_date[,c(1, 2)])
+```
+
+2. If you do not understand the difference between a histogram and a barplot, research the difference between them. Make a histogram of the total number of steps taken each day
+
+```{r histograma}
+barplot(stat_vs_date$steps.sum, col=stat_vs_date$date, names = stat_vs_date$date, main="Total steps per day", xlab = "DÌas", ylab = "Number of steps")
+```
+
+3. Calculate and report the mean and median of the total number of steps taken per day
+
+```{r median_mean}
+head(stat_vs_date[,c(1, 3, 4)])
+```
+
+**What is the average daily activity pattern?**
+
+1. Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+
+```{r serie plot}
+## Calculate the average for each interval
+stat_vs_interval = summaryBy(steps ~ interval, data=tabAct, FUN=c(mean))
+
+plot(x=stat_vs_interval$interval, y=stat_vs_interval$steps.mean, type="l", main="Average per interval step", xlab = "Interval", ylab = "Number of steps")
+```
 
 
+2. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
 
-## What is the average daily activity pattern?
-
-
-
-## Imputing missing values
-
+```{r maximo}
+max(stat_vs_interval$steps.mean)
+```
 
 
-## Are there differences in activity patterns between weekdays and weekends?
+**Imputing missing values**
+
+Note that there are a number of days/intervals where there are missing values (coded as NA). The presence of missing days may introduce bias into some calculations or summaries of the data.
+
+1. Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
+
+```{r missing}
+## Gets the number of rows
+dim(subset(tabAll, is.na(steps)))[1]
+
+```
+
+2. Devise a strategy for filling in all of the missing values in the dataset. The strategy does not need to be sophisticated. For example, you could use the mean/median for that day, or the mean for that 5-minute interval, etc.
+
+```{r strategy}
+## Create a data.form with nulls steps
+tabNA = tabAll[is.na(tabAll[,1]),]
+
+## Make join of data.form witout nulls ago with the data.form having the average interval steps
+mergeData = arrange(join(tabNA, stat_vs_interval), interval)
+names(mergeData) = c("nulo", "date", "interval", "steps")
+head(mergeData)
+
+```
+
+3. Create a new dataset that is equal to the original dataset but with the missing data filled in.
+
+```{r new data set}
+## Create a data.form where null values as replaced with the mean values of the intervals. 
+tabComplete = rbind(tabAct, mergeData[,c(4, 2, 3)])
+## Sort the records
+tabComplete = tabComplete[order(tabComplete$date),]
+head(tabComplete)
+
+```
+
+4. Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
+
+```{r histogram 2}
+## Gets the sum, mean and median per day
+tot_steps_date2 = summaryBy(steps ~ date, data=tabComplete, FUN=c(sum, mean, median))
+
+barplot(tot_steps_date2$steps.sum, col=tot_steps_date2$date, names = tot_steps_date2$date, main="Total de pasos por dÌa (completo)", xlab = "DÌas", ylab = "N˙mero de pasos")
+
+## It presents the first values of the sum of steps per day
+head(tot_steps_date2[,c(1, 3, 4)])
+head(stat_vs_date[,c(1, 3, 4)])
+
+##It can be seen only on the 2010-10-01 day that is where I had all null values is affected by the substitution of null values. All other values are to continue looking, because the null values are replaced with the average values of the intervals, which does not alter significantly the behavior of the data.
+
+```
+
+
+**Are there differences in activity patterns between weekdays and weekends?**
+
+For this part the weekdays() function may be of some help here. Use the dataset with the filled-in missing values for this part.
+
+1. Create a new factor variable in the dataset with two levels - "weekday" Äand "weekday"Äù indicating whether a given date is a weekday or weekend day.
+
+```{r factor}
+# Create a column indicating the day of the week
+tabComplete$day = weekdays(as.Date(tabComplete$date))
+# Gets the number of the week in question
+tabComplete$Numday = as.POSIXlt(tabComplete$date)$wday
+# Create a column factor (weekday, weekend)
+tabComplete$factor = "weekday"
+tabComplete[tabComplete$Numday == 0 | tabComplete$Numday == 6, 6] = "weekend"
+# It show the values of the interval 5
+head(tabComplete[tabComplete$interval == 5,], 20)
+```
+
+
+2. Make a panel plot containing a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis). See the README file in the GitHub repository to see an example of what this plot should look like using simulated data
+
+```{r xyplot}
+## Gets the mean of the intvervals to weekday and weekend
+stat_vs_interval_2 = summaryBy(steps ~ interval + factor, data=tabComplete, FUN=c(mean))
+head(stat_vs_interval_2)
+
+xyplot(steps.mean ~ interval | factor, data = stat_vs_interval_2, layout = c(1, 2), type="a", xlab="Interval", ylab="Number of steps")
+
+```
